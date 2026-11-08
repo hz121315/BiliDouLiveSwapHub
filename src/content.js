@@ -93,6 +93,8 @@
   };
 
   let ui = {};
+  let originalAudioContext = null;
+  const originalAudioNodes = new WeakMap();
 
   // ---------------------------------------------------------------- helpers
 
@@ -607,7 +609,6 @@
       if (state.followBiliVolume && state.orig) {
         state.volume = clamp(state.orig.volume, 0, 1);
         applyAudio();
-        syncOrigVolumeQuiet();
       }
       saveRoomConfig({ followBiliVolume: state.followBiliVolume });
       updateUi();
@@ -1204,7 +1205,8 @@
       },
       volumechange: () => {
         if (!state.active) return;
-        if (performance.now() < state.suppressVolumeUntil) return;
+        const audio = originalAudioNodes.get(video);
+        if (!audio && performance.now() < state.suppressVolumeUntil) return;
         if (!state.followBiliVolume) {
           // 不跟随音量时也不能让原视频出声，只重新静音，不覆盖 B 站音量条位置。
           if (!video.muted) {
@@ -1217,10 +1219,17 @@
           }
           return;
         }
+        // 只忽略我们自己写回的状态；不能用时间窗口吞掉紧接着发生的用户操作。
+        const muted = state.muted || state.autoplayMuted || state.volume <= 0.001;
+        if (audio && video.muted === muted && Math.abs(video.volume - state.volume) <= 0.001) return;
         state.volume = clamp(video.volume, 0, 1);
-        if (!video.muted && state.volume > 0) state.muted = false;
+        if (audio) {
+          state.muted = video.muted;
+          state.autoplayMuted = false;
+        } else if (!video.muted && state.volume > 0) {
+          state.muted = false;
+        }
         applyAudio();
-        syncOrigVolumeQuiet();
         saveRoomConfig({ volume: state.volume, muted: state.muted });
         updateUi();
       }
@@ -1250,10 +1259,7 @@
     if (!video) return;
     // 用 opacity 而不是 visibility：原视频仍可被点击命中，B站“点击暂停/双击全屏”不受影响。
     if (video.style.opacity !== '0') video.style.opacity = '0';
-    const volumeMismatch = state.followBiliVolume && Math.abs(video.volume - state.volume) > 0.001;
-    if (!video.muted || volumeMismatch) {
-      syncOrigVolumeQuiet();
-    }
+    syncOrigVolumeQuiet();
   }
 
   function restoreOriginal() {
@@ -1275,17 +1281,66 @@
       /* noop */
     }
 
+    const audio = originalAudioNodes.get(video);
+    if (audio) {
+      audio.gain.gain.value = 1;
+      resumeOriginalAudio();
+    }
     state.origSaved = null;
     state.origSavedEl = null;
   }
 
+  function getOriginalAudio(video) {
+    if (originalAudioNodes.has(video)) return originalAudioNodes.get(video);
+    if (!state.followBiliVolume) return null;
+
+    // 没有 CORS 的跨域媒体经 Web Audio 路由后会永久无声；保留原来的静音兜底。
+    const src = video.currentSrc || video.src;
+    if (!video.srcObject && (!src ||
+      (!video.crossOrigin && new URL(src, location.href).origin !== location.origin))) return null;
+
+    let gain = null;
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return null;
+      if (!originalAudioContext) originalAudioContext = new AudioContextClass();
+      gain = originalAudioContext.createGain();
+      gain.gain.value = 0;
+      gain.connect(originalAudioContext.destination);
+      const source = originalAudioContext.createMediaElementSource(video);
+      source.connect(gain);
+      const audio = { source, gain };
+      originalAudioNodes.set(video, audio);
+      return audio;
+    } catch (error) {
+      if (gain) gain.disconnect();
+      originalAudioNodes.set(video, null);
+      console.warn('[BDS] original audio routing unavailable, falling back to mute', error);
+      return null;
+    }
+  }
+
+  function resumeOriginalAudio() {
+    if (originalAudioContext && originalAudioContext.state === 'suspended') {
+      originalAudioContext.resume().catch(() => {});
+    }
+  }
+
   function syncOrigVolumeQuiet() {
     const video = state.orig;
-    if (!video) return;
+    if (!state.active || !video) return;
+    // 用零增益压掉原声，让 video.muted 留给 B 站控件表示用户的真实静音状态。
+    const audio = getOriginalAudio(video);
+    if (audio) audio.gain.gain.value = 0;
+    const muted = audio && state.followBiliVolume
+      ? state.muted || state.autoplayMuted || state.volume <= 0.001
+      : true;
+    const volumeMismatch = state.followBiliVolume && Math.abs(video.volume - state.volume) > 0.001;
+    if (video.muted === muted && !volumeMismatch) return;
     state.suppressVolumeUntil = performance.now() + 120;
     try {
       if (state.followBiliVolume) video.volume = state.volume;
-      video.muted = true;
+      video.muted = muted;
     } catch (error) {
       /* noop */
     }
@@ -1293,9 +1348,11 @@
 
   function applyAudio() {
     const video = state.overlay;
-    if (!video) return;
-    video.volume = clamp(state.volume, 0, 1);
-    video.muted = state.muted || state.autoplayMuted || state.volume <= 0.001;
+    if (video) {
+      video.volume = clamp(state.volume, 0, 1);
+      video.muted = state.muted || state.autoplayMuted || state.volume <= 0.001;
+    }
+    syncOrigVolumeQuiet();
   }
 
   // ---------------------------------------------------------------- 连接/换源
@@ -2092,7 +2149,6 @@
     state.volume = clamp(Number(value) || 0, 0, 1);
     if (state.volume > 0 && state.muted) state.muted = false;
     applyAudio();
-    syncOrigVolumeQuiet();
     if (persist) saveRoomConfig({ volume: state.volume, muted: state.muted });
     updateUi();
   }
@@ -2101,7 +2157,6 @@
     state.muted = !!muted;
     state.autoplayMuted = false;
     applyAudio();
-    syncOrigVolumeQuiet();
     saveRoomConfig({ muted: state.muted });
     updateUi();
   }
@@ -2148,6 +2203,7 @@
     };
 
     const onPointer = (event) => {
+      resumeOriginalAudio();
       const target = event.target;
       const touch = event.changedTouches && event.changedTouches[0];
       const x = touch ? touch.clientX : event.clientX;
@@ -2160,6 +2216,7 @@
     document.addEventListener('pointerdown', onPointer, true);
     document.addEventListener('touchstart', onPointer, true);
     document.addEventListener('keydown', (event) => {
+      resumeOriginalAudio();
       const target = event.target;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' ||
         target.tagName === 'SELECT' || target.isContentEditable)) {

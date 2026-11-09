@@ -33,10 +33,10 @@
 ### 方式一：安装 Release 压缩包（推荐）
 
 1. 打开 [Releases](https://github.com/hz121315/BiliDouLiveSwapHub/releases) 页面。
-2. 下载最新版本里的 `BiliDouLiveSwapHub-v1.4.1.zip`。
-   - 如果 Release 暂时没有附加 zip，可在标签 `v1.4.1` 页面下载 **Source code (zip)**，或直接使用仓库 `release/BiliDouLiveSwapHub-v1.4.1.zip`。
+2. 下载最新版本里的 `BiliDouLiveSwapHub-v1.4.2.zip`。
+   - 如果 Release 暂时没有附加 zip，可在标签 `v1.4.2` 页面下载 **Source code (zip)**，或直接使用仓库 `release/BiliDouLiveSwapHub-v1.4.2.zip`。
 3. 解压到一个固定目录，例如 `D:\BiliDouLiveSwapHub`。**不要直接加载 zip 文件**，Chrome/Edge 只认解压后的目录。
-4. 打开解压目录，确认这一层能直接看到 `manifest.json`、`background.js`、`src/`、`vendor/`。如果解压后多套了一层 `BiliDouLiveSwapHub-v1.4.1/`，请进入这一层再加载。
+4. 打开解压目录，确认这一层能直接看到 `manifest.json`、`background.js`、`src/`、`vendor/`。如果解压后多套了一层 `BiliDouLiveSwapHub-v1.4.2/`，请进入这一层再加载。
 5. Chrome 打开 `chrome://extensions`，Edge 打开 `edge://extensions`，开启右上角“开发者模式”。
 6. 点击“加载已解压的扩展程序”，选择包含 `manifest.json` 的目录。
 7. 打开任意 B 站直播间，例如 <https://live.bilibili.com/545318>，播放器右上角会出现 BiliDouLiveSwapHub 面板。
@@ -45,7 +45,7 @@
 压缩包解压后的结构应类似：
 
 ```text
-BiliDouLiveSwapHub-v1.4.1/
+BiliDouLiveSwapHub-v1.4.2/
 ├─ manifest.json
 ├─ background.js
 ├─ src/
@@ -302,11 +302,11 @@ B 站的“网页全屏”和容器全屏会带着扩展的叠加层一起显示
 1. 修改 `manifest.json` 里的 `version`，并同步更新 README 更新记录。
 2. 打包时把 `manifest.json` 放在压缩包根目录，至少包含：
    `manifest.json`、`background.js`、`src/`、`vendor/`、`icons/`、`licenses/`、`LICENSE`、`THIRD_PARTY_NOTICES.md`、`README.md`。
-3. 压缩包命名建议：`BiliDouLiveSwapHub-v<版本号>.zip`，例如本仓库的 `release/BiliDouLiveSwapHub-v1.4.1.zip`。
+3. 压缩包命名建议：`BiliDouLiveSwapHub-v<版本号>.zip`，例如本仓库的 `release/BiliDouLiveSwapHub-v1.4.2.zip`。
 4. 在 GitHub 仓库的 **Releases → Draft a new release**：
-   - Tag：`v1.4.1`（与 manifest 版本一致）；
-   - Title：`BiliDouLiveSwapHub v1.4.1`；
-   - 上传 `BiliDouLiveSwapHub-v1.4.1.zip` 作为 Release asset；
+   - Tag：`v1.4.2`（与 manifest 版本一致）；
+   - Title：`BiliDouLiveSwapHub v1.4.2`；
+   - 上传 `BiliDouLiveSwapHub-v1.4.2.zip` 作为 Release asset；
    - 填写更新说明后发布。
 5. 发布后，README 里的 [Releases](https://github.com/hz121315/BiliDouLiveSwapHub/releases) 链接即可直接下载压缩包。
 
